@@ -172,6 +172,12 @@ function clearBulk() {
 }
 
 const showSinglePrintSheet = ref(false)
+const singlePrintMode = ref<'full' | 'code-only'>('full')
+
+function openPrintStudio(mode: 'full' | 'code-only' = 'full') {
+  singlePrintMode.value = mode
+  showSinglePrintSheet.value = true
+}
 
 const singlePrintItems = computed<PrintableLabelItem[]>(() => {
   return [
@@ -236,6 +242,7 @@ const singlePrintItems = computed<PrintableLabelItem[]>(() => {
         <BarcodePrintSheet
           :items="singlePrintItems"
           :code-type="codeKind"
+          :initial-print-mode="singlePrintMode"
           label-size="standard"
           @close="showSinglePrintSheet = false"
         />
@@ -438,14 +445,25 @@ const singlePrintItems = computed<PrintableLabelItem[]>(() => {
             </Button>
           </div>
 
-          <Button
-            size="sm"
-            class="w-full h-9 gap-1.5 text-xs cursor-pointer font-semibold bg-primary text-primary-foreground"
-            @click="showSinglePrintSheet = !showSinglePrintSheet"
-          >
-            <Printer class="size-4" />
-            <span>{{ showSinglePrintSheet ? 'Close Print Studio' : `Print ${labelCopies} Label${labelCopies > 1 ? 's' : ''} (Sheet Studio)` }}</span>
-          </Button>
+          <div class="grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              class="h-9 gap-1.5 text-xs cursor-pointer font-semibold bg-primary text-primary-foreground"
+              @click="openPrintStudio('full')"
+            >
+              <Printer class="size-3.5" />
+              <span>Print Label Card</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              class="h-9 gap-1.5 text-xs cursor-pointer font-semibold border-border hover:bg-muted"
+              @click="openPrintStudio('code-only')"
+            >
+              <component :is="codeKind === 'barcode' ? BarcodeIcon : QrCode" class="size-3.5 text-primary" />
+              <span>Print Code Only</span>
+            </Button>
+          </div>
         </div>
       </div>
     </div>

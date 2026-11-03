@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue'
-import { Printer, X, Barcode, QrCode, Building2, CheckSquare } from '@lucide/vue'
+import { Printer, X, Barcode, QrCode, FileText } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { BarcodeService } from '@/services/barcode.service'
 import { QRCodeService } from '@/services/qr.service'
@@ -14,6 +14,7 @@ export interface PrintableLabelItem {
 }
 
 export type LabelDimensionPreset = 'standard' | 'compact' | 'large' | 'a4-grid' | 'thermal'
+export type PrintModeOption = 'full' | 'code-only'
 
 const props = withDefaults(
   defineProps<{
@@ -27,6 +28,7 @@ const props = withDefaults(
     companyName?: string
     showAssetTag?: boolean
     visible?: boolean
+    initialPrintMode?: PrintModeOption
   }>(),
   {
     labelSize: 'standard',
@@ -38,6 +40,7 @@ const props = withDefaults(
     companyName: 'DMBB INVENTORY',
     showAssetTag: true,
     visible: true,
+    initialPrintMode: 'full',
   }
 )
 
@@ -46,6 +49,7 @@ const emit = defineEmits<{
 }>()
 
 // Active print configurations
+const printMode = ref<PrintModeOption>(props.initialPrintMode)
 const activeCodeType = ref<'barcode' | 'qr' | 'both'>(props.codeType)
 const activeLabelSize = ref<LabelDimensionPreset>(props.labelSize)
 const displayPrice = ref(props.showPrice)
@@ -57,6 +61,7 @@ const displayAssetTag = ref(props.showAssetTag)
 
 const isPrinting = ref(false)
 const printableAreaRef = ref<HTMLElement | null>(null)
+const codeOnlyPrintRef = ref<HTMLElement | null>(null)
 
 const svgRefs = ref<Record<string, SVGSVGElement | null>>({})
 const canvasRefs = ref<Record<string, HTMLCanvasElement | null>>({})
@@ -76,28 +81,32 @@ async function renderAllCodes() {
     for (let c = 0; c < item.copies; c++) {
       const idKey = `${item.product.id}-${itemIdx}-${c}`
 
-      // 1. 1D Barcode (Code128 / EAN13)
+      // --- 1. Full Label Elements ---
       if (activeCodeType.value === 'barcode' || activeCodeType.value === 'both') {
-        const svgEl = svgRefs.value[`barcode-${idKey}`]
-        if (svgEl) {
+        const fullSvgEl = svgRefs.value[`barcode-${idKey}`]
+        if (fullSvgEl) {
           const isCompact = activeLabelSize.value === 'compact'
           const isLarge = activeLabelSize.value === 'large'
           const isBoth = activeCodeType.value === 'both'
 
-          BarcodeService.renderBarcode(svgEl, item.product.barcode || item.product.sku, item.product.barcodeFormat || 'CODE128', {
-            width: isCompact ? 1.3 : isBoth ? 1.4 : isLarge ? 2.0 : 1.7,
-            height: isCompact ? 26 : isBoth ? 30 : isLarge ? 48 : 38,
-            fontSize: isCompact ? 9 : 11,
-            margin: 2,
-            displayValue: true,
-          })
+          BarcodeService.renderBarcode(
+            fullSvgEl,
+            item.product.barcode || item.product.sku,
+            item.product.barcodeFormat || 'CODE128',
+            {
+              width: isCompact ? 1.3 : isBoth ? 1.4 : isLarge ? 2.0 : 1.7,
+              height: isCompact ? 26 : isBoth ? 30 : isLarge ? 48 : 38,
+              fontSize: isCompact ? 9 : 11,
+              margin: 2,
+              displayValue: true,
+            }
+          )
         }
       }
 
-      // 2. 2D QR Code
       if (activeCodeType.value === 'qr' || activeCodeType.value === 'both') {
-        const canvasEl = canvasRefs.value[`qr-${idKey}`]
-        if (canvasEl) {
+        const fullCanvasEl = canvasRefs.value[`qr-${idKey}`]
+        if (fullCanvasEl) {
           const qrText = QRCodeService.formatProductPayload(item.product)
           const qrWidth =
             activeLabelSize.value === 'compact'
@@ -108,7 +117,51 @@ async function renderAllCodes() {
                   ? 110
                   : 84
 
-          await QRCodeService.renderToCanvas(canvasEl, qrText, {
+          await QRCodeService.renderToCanvas(fullCanvasEl, qrText, {
+            width: qrWidth,
+            margin: 1,
+            errorCorrectionLevel: 'M',
+          })
+        }
+      }
+
+      // --- 2. Code-Only Elements (Clean, Unbounded, Sharp Scannability) ---
+      if (activeCodeType.value === 'barcode' || activeCodeType.value === 'both') {
+        const codeOnlySvg = svgRefs.value[`codeonly-barcode-${idKey}`]
+        if (codeOnlySvg) {
+          const isCompact = activeLabelSize.value === 'compact'
+          const isLarge = activeLabelSize.value === 'large'
+          const isBoth = activeCodeType.value === 'both'
+
+          BarcodeService.renderBarcode(
+            codeOnlySvg,
+            item.product.barcode || item.product.sku,
+            item.product.barcodeFormat || 'CODE128',
+            {
+              width: isCompact ? 1.4 : isBoth ? 1.5 : isLarge ? 2.2 : 1.8,
+              height: isCompact ? 34 : isBoth ? 38 : isLarge ? 64 : 48,
+              fontSize: isCompact ? 10 : 12,
+              margin: 4,
+              displayValue: true,
+            }
+          )
+        }
+      }
+
+      if (activeCodeType.value === 'qr' || activeCodeType.value === 'both') {
+        const codeOnlyCanvas = canvasRefs.value[`codeonly-qr-${idKey}`]
+        if (codeOnlyCanvas) {
+          const qrText = QRCodeService.formatProductPayload(item.product)
+          const qrWidth =
+            activeLabelSize.value === 'compact'
+              ? 84
+              : activeCodeType.value === 'both'
+                ? 88
+                : activeLabelSize.value === 'large'
+                  ? 144
+                  : 108
+
+          await QRCodeService.renderToCanvas(codeOnlyCanvas, qrText, {
             width: qrWidth,
             margin: 1,
             errorCorrectionLevel: 'M',
@@ -124,6 +177,7 @@ watch(
     props.items,
     activeCodeType.value,
     activeLabelSize.value,
+    printMode.value,
     displayPrice.value,
     displaySku.value,
     displayProductName.value,
@@ -141,8 +195,10 @@ onMounted(() => {
   renderAllCodes()
 })
 
-async function handlePrint() {
-  if (!printableAreaRef.value) return
+async function handlePrint(modeToPrint: PrintModeOption = printMode.value) {
+  printMode.value = modeToPrint
+  const targetElement = modeToPrint === 'code-only' ? codeOnlyPrintRef.value : printableAreaRef.value
+  if (!targetElement) return
   isPrinting.value = true
 
   try {
@@ -152,9 +208,12 @@ async function handlePrint() {
     // 2. Small settle wait for canvas buffer
     await new Promise((r) => setTimeout(r, 60))
 
-    // 3. Delegate to enterprise PrintService (clones into root portal, converts canvas to PNG <img>)
-    await PrintService.printElement(printableAreaRef.value, {
-      pageTitle: `Inventory_Labels_${activeLabelSize.value}`,
+    // 3. Delegate to enterprise PrintService (clones target into root portal, converts canvas to PNG <img>)
+    await PrintService.printElement(targetElement, {
+      pageTitle:
+        modeToPrint === 'code-only'
+          ? `Inventory_Codes_${activeCodeType.value}_${activeLabelSize.value}`
+          : `Inventory_Labels_${activeLabelSize.value}`,
     })
   } catch (err) {
     console.error('Failed to execute label print:', err)
@@ -173,20 +232,35 @@ async function handlePrint() {
           <Printer class="size-4 text-primary" />
           <h3 class="text-sm font-semibold">Inventory Label Print Studio</h3>
           <span class="text-xs text-muted-foreground font-mono">
-            ({{ items.reduce((acc, i) => acc + i.copies, 0) }} label{{ items.reduce((acc, i) => acc + i.copies, 0) > 1 ? 's' : '' }})
+            ({{ items.reduce((acc, i) => acc + i.copies, 0) }} item{{ items.reduce((acc, i) => acc + i.copies, 0) > 1 ? 's' : '' }})
           </span>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Print Full Labels Button -->
           <Button
             size="sm"
-            class="h-8 gap-1.5 cursor-pointer bg-primary text-primary-foreground font-semibold"
+            class="h-8 gap-1.5 cursor-pointer font-semibold transition-colors"
+            :class="printMode === 'full' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/80'"
             :disabled="isPrinting || items.length === 0"
-            @click="handlePrint"
+            @click="handlePrint('full')"
           >
-            <Printer class="size-3.5" />
-            <span>{{ isPrinting ? 'Preparing Spool...' : 'Print Label Sheet' }}</span>
+            <FileText class="size-3.5" />
+            <span>{{ isPrinting && printMode === 'full' ? 'Preparing Spool...' : 'Print Full Label' }}</span>
           </Button>
+
+          <!-- Print Code Only Button -->
+          <Button
+            size="sm"
+            class="h-8 gap-1.5 cursor-pointer font-semibold transition-colors"
+            :class="printMode === 'code-only' ? 'bg-primary text-primary-foreground' : 'border border-border bg-card text-foreground hover:bg-muted'"
+            :disabled="isPrinting || items.length === 0"
+            @click="handlePrint('code-only')"
+          >
+            <component :is="activeCodeType === 'qr' ? QrCode : Barcode" class="size-3.5" />
+            <span>{{ isPrinting && printMode === 'code-only' ? 'Preparing Spool...' : 'Print Code Only' }}</span>
+          </Button>
+
           <Button variant="ghost" size="sm" class="h-8 size-8 p-0" @click="emit('close')">
             <X class="size-4" />
           </Button>
@@ -194,7 +268,32 @@ async function handlePrint() {
       </div>
 
       <!-- Controls Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+        <!-- Print Mode Selector -->
+        <div>
+          <label class="text-muted-foreground font-medium block mb-1">Print Mode</label>
+          <div class="inline-flex rounded-md p-0.5 bg-muted w-full">
+            <button
+              type="button"
+              class="flex-1 flex items-center justify-center gap-1 py-1 text-xs font-medium rounded cursor-pointer transition-colors"
+              :class="printMode === 'full' ? 'bg-background text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'"
+              @click="printMode = 'full'"
+            >
+              <FileText class="size-3.5" />
+              <span>Full Label</span>
+            </button>
+            <button
+              type="button"
+              class="flex-1 flex items-center justify-center gap-1 py-1 text-xs font-medium rounded cursor-pointer transition-colors"
+              :class="printMode === 'code-only' ? 'bg-background text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'"
+              @click="printMode = 'code-only'"
+            >
+              <component :is="activeCodeType === 'qr' ? QrCode : Barcode" class="size-3.5" />
+              <span>Code Only</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Code Format Type -->
         <div>
           <label class="text-muted-foreground font-medium block mb-1">Code Format</label>
@@ -202,7 +301,7 @@ async function handlePrint() {
             <button
               type="button"
               class="flex-1 flex items-center justify-center gap-1 py-1 text-xs font-medium rounded cursor-pointer transition-colors"
-              :class="activeCodeType === 'barcode' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+              :class="activeCodeType === 'barcode' ? 'bg-background text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'"
               @click="activeCodeType = 'barcode'"
             >
               <Barcode class="size-3.5" />
@@ -211,7 +310,7 @@ async function handlePrint() {
             <button
               type="button"
               class="flex-1 flex items-center justify-center gap-1 py-1 text-xs font-medium rounded cursor-pointer transition-colors"
-              :class="activeCodeType === 'qr' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+              :class="activeCodeType === 'qr' ? 'bg-background text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'"
               @click="activeCodeType = 'qr'"
             >
               <QrCode class="size-3.5" />
@@ -220,70 +319,87 @@ async function handlePrint() {
             <button
               type="button"
               class="flex-1 flex items-center justify-center py-1 text-xs font-medium rounded cursor-pointer transition-colors"
-              :class="activeCodeType === 'both' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+              :class="activeCodeType === 'both' ? 'bg-background text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'"
               @click="activeCodeType = 'both'"
             >
-              <span>Both (1D+2D)</span>
+              <span>Both</span>
             </button>
           </div>
         </div>
 
         <!-- Label Size / Paper Layout Preset -->
         <div>
-          <label class="text-muted-foreground font-medium block mb-1">Sheet / Label Layout</label>
+          <label class="text-muted-foreground font-medium block mb-1">Layout Preset</label>
           <select
             v-model="activeLabelSize"
             class="w-full h-8 px-2 rounded-md border border-input bg-background text-xs font-medium focus:outline-none"
           >
-            <option value="standard">Standard Bin Tag (50×30mm - 3 cols)</option>
+            <option value="standard">Standard Bin (50×30mm - 3 cols)</option>
             <option value="a4-grid">A4 Full Sheet Grid (3×8 Sticker Sheet)</option>
-            <option value="compact">Compact Asset Tag (40×20mm - 4 cols)</option>
-            <option value="large">Large Shipping Carton (70×40mm - 2 cols)</option>
-            <option value="thermal">Thermal Roll Printer (Single Continuous)</option>
+            <option value="compact">Compact Tag (40×20mm - 4 cols)</option>
+            <option value="large">Large Shipping (70×40mm - 2 cols)</option>
+            <option value="thermal">Thermal Continuous Roll (1 col)</option>
           </select>
         </div>
 
-        <!-- Company Branding Input -->
-        <div>
-          <label class="text-muted-foreground font-medium block mb-1">Company Wordmark</label>
+        <!-- Company Wordmark (Full Label Mode only) -->
+        <div :class="{ 'opacity-50 pointer-events-none': printMode === 'code-only' }">
+          <label class="text-muted-foreground font-medium block mb-1">
+            Company Wordmark
+            <span v-if="printMode === 'code-only'" class="text-[10px] text-muted-foreground">(omitted)</span>
+          </label>
           <input
             v-model="activeCompanyName"
+            :disabled="printMode === 'code-only'"
             placeholder="e.g. DMBB INVENTORY"
             class="w-full h-8 px-2 rounded-md border border-input bg-background text-xs font-mono"
           />
         </div>
 
-        <!-- Visible Field Checkboxes -->
-        <div>
-          <label class="text-muted-foreground font-medium block mb-1">Included Content</label>
+        <!-- Visible Field Checkboxes (Full Label Mode only) -->
+        <div :class="{ 'opacity-50 pointer-events-none': printMode === 'code-only' }">
+          <label class="text-muted-foreground font-medium block mb-1">
+            Label Content Fields
+            <span v-if="printMode === 'code-only'" class="text-[10px] text-muted-foreground">(omitted)</span>
+          </label>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1">
             <label class="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" v-model="displayCompany" class="rounded border-input size-3" />
+              <input type="checkbox" v-model="displayCompany" :disabled="printMode === 'code-only'" class="rounded border-input size-3" />
               <span>Company</span>
             </label>
             <label class="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" v-model="displayProductName" class="rounded border-input size-3" />
+              <input type="checkbox" v-model="displayProductName" :disabled="printMode === 'code-only'" class="rounded border-input size-3" />
               <span>Name</span>
             </label>
             <label class="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" v-model="displaySku" class="rounded border-input size-3" />
+              <input type="checkbox" v-model="displaySku" :disabled="printMode === 'code-only'" class="rounded border-input size-3" />
               <span>SKU</span>
             </label>
             <label class="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" v-model="displayAssetTag" class="rounded border-input size-3" />
-              <span>Asset Tag</span>
+              <input type="checkbox" v-model="displayAssetTag" :disabled="printMode === 'code-only'" class="rounded border-input size-3" />
+              <span>Tag</span>
             </label>
             <label class="flex items-center gap-1 cursor-pointer">
-              <input type="checkbox" v-model="displayPrice" class="rounded border-input size-3" />
-              <span>Price (₱)</span>
+              <input type="checkbox" v-model="displayPrice" :disabled="printMode === 'code-only'" class="rounded border-input size-3" />
+              <span>₱ Price</span>
             </label>
           </div>
         </div>
       </div>
+
+      <!-- Mode Explanation Banner -->
+      <div v-if="printMode === 'code-only'" class="bg-primary/5 border border-primary/20 rounded-md p-2 flex items-center justify-between text-xs text-foreground">
+        <span class="flex items-center gap-1.5 font-medium">
+          <component :is="activeCodeType === 'qr' ? QrCode : Barcode" class="size-3.5 text-primary" />
+          Code-Only Mode active: Only the isolated barcode/QR matrix will print with zero card borders, text, or company branding.
+        </span>
+        <span class="text-[11px] text-muted-foreground">White background · Scannable vector/image</span>
+      </div>
     </div>
 
-    <!-- Printable Area (Rendered in preview & cloned to print portal on print) -->
+    <!-- 1. FULL LABEL PRINT CONTAINER (Rendered in preview & cloned when Print Full Label is called) -->
     <div
+      v-show="printMode === 'full'"
       ref="printableAreaRef"
       id="printable-area"
       class="bg-white text-black p-3 font-sans rounded-lg border border-neutral-200"
@@ -300,7 +416,7 @@ async function handlePrint() {
         <template v-for="(item, itemIdx) in items" :key="item.product.id">
           <div
             v-for="copyIndex in item.copies"
-            :key="`${item.product.id}-${itemIdx}-${copyIndex}`"
+            :key="`full-${item.product.id}-${itemIdx}-${copyIndex}`"
             class="label-card flex flex-col justify-between border border-dashed border-neutral-300 p-2 text-center bg-white text-black relative"
             :class="{
               'min-h-[115px]': activeLabelSize === 'compact',
@@ -381,11 +497,72 @@ async function handlePrint() {
         </template>
       </div>
     </div>
+
+    <!-- 2. DEDICATED CODE-ONLY PRINT CONTAINER (Rendered in preview & cloned when Print Code Only is called) -->
+    <!-- Contains ONLY the generated SVG barcode and/or QR canvas. NO borders, NO branding, NO text, NO prices. Pure white background. -->
+    <div
+      v-show="printMode === 'code-only'"
+      ref="codeOnlyPrintRef"
+      id="code-only-printable-area"
+      class="bg-white text-black p-3 font-sans rounded-lg border border-neutral-200"
+    >
+      <div
+        class="grid gap-3"
+        :class="{
+          'grid-cols-2 sm:grid-cols-3 print:grid-cols-3': activeLabelSize === 'standard' || activeLabelSize === 'a4-grid',
+          'grid-cols-3 sm:grid-cols-4 print:grid-cols-4': activeLabelSize === 'compact',
+          'grid-cols-1 sm:grid-cols-2 print:grid-cols-2': activeLabelSize === 'large',
+          'grid-cols-1 print:grid-cols-1 max-w-[280px] mx-auto': activeLabelSize === 'thermal',
+        }"
+      >
+        <template v-for="(item, itemIdx) in items" :key="item.product.id">
+          <div
+            v-for="copyIndex in item.copies"
+            :key="`codeonly-${item.product.id}-${itemIdx}-${copyIndex}`"
+            class="code-only-item flex items-center justify-center p-2 text-center bg-white"
+            style="page-break-inside: avoid; break-inside: avoid; background-color: #ffffff;"
+          >
+            <!-- 1. Barcode Only (Clean SVG, centered, no card border, scannable digits included under bars) -->
+            <div v-if="activeCodeType === 'barcode'" class="w-full flex justify-center items-center">
+              <svg
+                :ref="(el) => setSvgRef(`codeonly-barcode-${item.product.id}-${itemIdx}-${copyIndex - 1}`, el)"
+                class="max-w-full h-auto"
+              ></svg>
+            </div>
+
+            <!-- 2. QR Code Only (Clean canvas, high resolution, centered, zero clutter) -->
+            <div v-else-if="activeCodeType === 'qr'" class="flex justify-center items-center">
+              <canvas
+                :ref="(el) => setCanvasRef(`codeonly-qr-${item.product.id}-${itemIdx}-${copyIndex - 1}`, el)"
+                class="max-h-full max-w-full"
+              ></canvas>
+            </div>
+
+            <!-- 3. Both Barcode & QR Code (Dual matrix side-by-side, no surrounding text or box) -->
+            <div v-else class="w-full flex items-center justify-center gap-3">
+              <div class="flex-1 flex justify-center overflow-hidden">
+                <svg
+                  :ref="(el) => setSvgRef(`codeonly-barcode-${item.product.id}-${itemIdx}-${copyIndex - 1}`, el)"
+                  class="max-w-full h-auto"
+                ></svg>
+              </div>
+              <div class="shrink-0 flex justify-center">
+                <canvas
+                  :ref="(el) => setCanvasRef(`codeonly-qr-${item.product.id}-${itemIdx}-${copyIndex - 1}`, el)"
+                  class="size-20"
+                ></canvas>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.label-card {
+.label-card,
+.code-only-item {
   page-break-inside: avoid;
   break-inside: avoid;
 }

@@ -162,7 +162,8 @@
     overflow: visible !important;
   }
 
-  .label-card {
+  .label-card,
+  .code-only-item {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
