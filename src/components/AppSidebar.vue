@@ -1,22 +1,25 @@
 <script setup lang="ts">
 import type { SidebarProps } from '@/components/ui/sidebar'
-
+import { computed } from 'vue'
+import { useRoute, RouterLink } from 'vue-router'
 import {
-  AudioWaveform,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  GalleryVerticalEnd,
-  Map,
-  PieChart,
-  Settings2,
-  SquareTerminal,
+  Boxes,
+  LayoutDashboard,
+  Package,
+  ScanLine,
+  Barcode,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  SlidersHorizontal,
+  History,
+  FolderTree,
+  Truck,
+  Ruler,
+  BarChart3,
+  Settings,
 } from "@lucide/vue"
-import NavMain from '@/components/NavMain.vue'
-import NavProjects from '@/components/NavProjects.vue'
 import NavUser from '@/components/NavUser.vue'
-import TeamSwitcher from '@/components/TeamSwitcher.vue'
+import { AuthService } from '@/services/auth.service'
 
 import {
   Sidebar,
@@ -24,154 +27,109 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
 } from '@/components/ui/sidebar'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: "icon",
 })
 
-// This is sample data.
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+const route = useRoute()
+const currentUser = computed(() => AuthService.getUser())
+
+const navigationGroups = [
+  {
+    label: 'Main',
+    items: [
+      { title: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    ],
   },
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
-  navMain: [
-    {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
+  {
+    label: 'Inventory',
+    items: [
+      { title: 'Products', path: '/products', icon: Package },
+      { title: 'Barcode Scanner', path: '/barcode-scanner', icon: ScanLine },
+      { title: 'Barcode Generator', path: '/barcode-generator', icon: Barcode },
+      { title: 'Stock In', path: '/stock-in', icon: ArrowDownToLine },
+      { title: 'Stock Out', path: '/stock-out', icon: ArrowUpFromLine },
+      { title: 'Stock Adjustments', path: '/stock-adjustments', icon: SlidersHorizontal },
+      { title: 'Inventory History', path: '/inventory-history', icon: History },
+    ],
+  },
+  {
+    label: 'Management',
+    items: [
+      { title: 'Categories', path: '/categories', icon: FolderTree },
+      { title: 'Suppliers', path: '/suppliers', icon: Truck },
+      { title: 'Units of Measure', path: '/units', icon: Ruler },
+    ],
+  },
+  {
+    label: 'Reports',
+    items: [
+      { title: 'Inventory Reports', path: '/reports', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { title: 'Settings', path: '/settings', icon: Settings },
+    ],
+  },
+]
+
+function isActive(path: string): boolean {
+  if (path === '/products') {
+    return route.path === '/products' || route.path.startsWith('/products/')
+  }
+  return route.path === path
 }
 </script>
 
 <template>
   <Sidebar v-bind="props">
-    <SidebarHeader>
-      <TeamSwitcher :teams="data.teams" />
+    <!-- Clean Branding Header replacing TeamSwitcher -->
+    <SidebarHeader class="border-b border-sidebar-border/50 py-3">
+      <div class="flex items-center gap-2.5 px-2">
+        <div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
+          <Boxes class="size-4" />
+        </div>
+        <div class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+          <span class="truncate font-semibold tracking-tight text-foreground">DMBB Inventory</span>
+          <span class="truncate text-xs text-muted-foreground">Barcode & Stock Control</span>
+        </div>
+      </div>
     </SidebarHeader>
-    <SidebarContent>
-      <NavMain :items="data.navMain" />
-      <NavProjects :projects="data.projects" />
+
+    <SidebarContent class="py-2">
+      <SidebarGroup v-for="group in navigationGroups" :key="group.label">
+        <SidebarGroupLabel class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+          {{ group.label }}
+        </SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem v-for="item in group.items" :key="item.path">
+            <SidebarMenuButton
+              as-child
+              :is-active="isActive(item.path)"
+              :tooltip="item.title"
+              class="transition-colors"
+            >
+              <RouterLink :to="item.path">
+                <component :is="item.icon" class="size-4 shrink-0" />
+                <span class="truncate font-medium">{{ item.title }}</span>
+              </RouterLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
     </SidebarContent>
-    <SidebarFooter>
-      <NavUser :user="data.user" />
+
+    <SidebarFooter class="border-t border-sidebar-border/50 p-2">
+      <NavUser :user="currentUser" />
     </SidebarFooter>
     <SidebarRail />
   </Sidebar>
