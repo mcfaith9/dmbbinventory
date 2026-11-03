@@ -166,5 +166,31 @@
   .code-only-item {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+  }
+
+  #company-print-portal #printable-area-active,
+  #company-print-portal [id^="printable-area"],
+  #company-print-portal .printable-area {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #company-print-portal .label-card {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
   }
 }

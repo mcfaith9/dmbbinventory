@@ -171,12 +171,21 @@ function clearBulk() {
   bulkSelected.value = {}
 }
 
-const showSinglePrintSheet = ref(false)
-const singlePrintMode = ref<'full' | 'code-only'>('full')
+const singlePrintSheetRef = ref<InstanceType<typeof BarcodePrintSheet> | null>(null)
+const isPrinting = ref(false)
+const currentPrintMode = ref<'full' | 'code-only'>('full')
 
-function openPrintStudio(mode: 'full' | 'code-only' = 'full') {
-  singlePrintMode.value = mode
-  showSinglePrintSheet.value = true
+async function handleSinglePrint(mode: 'full' | 'code-only' = 'full') {
+  if (isPrinting.value) return
+  isPrinting.value = true
+  currentPrintMode.value = mode
+  try {
+    await singlePrintSheetRef.value?.handlePrint(mode)
+  } catch (err) {
+    console.error('Print failed:', err)
+  } finally {
+    isPrinting.value = false
+  }
 }
 
 const singlePrintItems = computed<PrintableLabelItem[]>(() => {
@@ -237,14 +246,14 @@ const singlePrintItems = computed<PrintableLabelItem[]>(() => {
 
     <!-- SINGLE GENERATOR MODE -->
     <div v-if="activeTab === 'single'" class="space-y-6">
-      <!-- Single Print Studio Sheet -->
-      <div v-if="showSinglePrintSheet" class="rounded-lg border border-border bg-card p-4 shadow-sm">
+      <!-- Background Print Engine for Single Labels (zero visual footprint, powers instant printing from Live Barcode Output) -->
+      <div style="position: fixed; left: -9999px; top: -9999px; width: 800px; pointer-events: none; opacity: 0;" aria-hidden="true">
         <BarcodePrintSheet
+          ref="singlePrintSheetRef"
           :items="singlePrintItems"
           :code-type="codeKind"
-          :initial-print-mode="singlePrintMode"
-          label-size="standard"
-          @close="showSinglePrintSheet = false"
+          company-name="DMBB INVENTORY"
+          :show-toolbar="false"
         />
       </div>
 
@@ -390,19 +399,55 @@ const singlePrintItems = computed<PrintableLabelItem[]>(() => {
       <!-- Preview & Export Card (5 cols) -->
       <div class="lg:col-span-5 rounded-lg border border-border bg-card p-5 shadow-xs flex flex-col justify-between space-y-4">
         <div>
-          <div class="flex items-center justify-between border-b pb-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
             <h2 class="text-sm font-semibold flex items-center gap-2">
               <component :is="codeKind === 'barcode' ? BarcodeIcon : QrCode" class="size-4 text-primary" />
               Live {{ codeKind === 'barcode' ? 'Barcode' : 'QR Code' }} Output
             </h2>
-            <span class="text-xs font-mono uppercase text-muted-foreground">
-              {{ codeKind === 'barcode' ? barcodeFormat : `QR (${qrErrorCorrection})` }}
-            </span>
+
+            <!-- Header Print Buttons (Moved from separate studio) -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-mono uppercase text-muted-foreground mr-1 hidden sm:inline">
+                {{ codeKind === 'barcode' ? barcodeFormat : `QR (${qrErrorCorrection})` }}
+              </span>
+
+              <Button
+                size="sm"
+                class="h-8 gap-1.5 text-xs font-semibold bg-primary text-primary-foreground cursor-pointer shadow-xs"
+                :disabled="isPrinting"
+                @click="handleSinglePrint('full')"
+              >
+                <Printer class="size-3.5" />
+                <span>{{ isPrinting && currentPrintMode === 'full' ? 'Preparing...' : 'Print Label' }}</span>
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                class="h-8 gap-1 text-xs font-medium cursor-pointer border-border hover:bg-muted"
+                :disabled="isPrinting"
+                @click="handleSinglePrint('code-only')"
+                title="Print barcode or QR code only without card borders or product text"
+              >
+                <component :is="codeKind === 'barcode' ? BarcodeIcon : QrCode" class="size-3 text-muted-foreground" />
+                <span>{{ isPrinting && currentPrintMode === 'code-only' ? 'Preparing...' : 'Code Only' }}</span>
+              </Button>
+            </div>
           </div>
 
           <!-- Label Card Simulator -->
-          <div class="mt-4 p-4 rounded-lg border border-neutral-300 bg-white text-black shadow-xs flex flex-col items-center justify-between text-center min-h-[200px]">
-            <div class="text-xs font-bold text-neutral-900 truncate max-w-full">
+          <div class="mt-4 p-4 rounded-lg border border-neutral-300 bg-white text-black shadow-xs flex flex-col items-center justify-between text-center min-h-[220px]">
+            <!-- Company & Asset Header -->
+            <div class="w-full flex items-center justify-between border-b border-neutral-200 pb-1 mb-1">
+              <span class="text-[9px] font-bold tracking-wider font-mono uppercase text-neutral-800">
+                DMBB INVENTORY
+              </span>
+              <span class="text-[8px] font-mono uppercase font-semibold text-neutral-500">
+                PROP #{{ (selectedProductId || '000001').slice(-6).toUpperCase() }}
+              </span>
+            </div>
+
+            <div class="text-xs font-bold text-neutral-900 truncate max-w-full px-1">
               {{ labelTitle || 'Product Name' }}
             </div>
 
@@ -430,8 +475,8 @@ const singlePrintItems = computed<PrintableLabelItem[]>(() => {
           </div>
         </div>
 
-        <!-- Action Buttons -->
-        <div class="space-y-2 pt-2 border-t">
+        <!-- Action Buttons (No duplicate print buttons) -->
+        <div class="pt-2 border-t">
           <div class="grid grid-cols-2 gap-2">
             <Button variant="outline" size="sm" class="h-8 gap-1.5 text-xs cursor-pointer" @click="copyCodeText">
               <Check v-if="copied" class="size-3.5 text-emerald-600" />
@@ -442,26 +487,6 @@ const singlePrintItems = computed<PrintableLabelItem[]>(() => {
             <Button variant="outline" size="sm" class="h-8 gap-1.5 text-xs cursor-pointer" @click="downloadBarcodeSvg">
               <Download class="size-3.5" />
               <span>Download {{ codeKind === 'barcode' ? 'SVG' : 'PNG' }}</span>
-            </Button>
-          </div>
-
-          <div class="grid grid-cols-2 gap-2">
-            <Button
-              size="sm"
-              class="h-9 gap-1.5 text-xs cursor-pointer font-semibold bg-primary text-primary-foreground"
-              @click="openPrintStudio('full')"
-            >
-              <Printer class="size-3.5" />
-              <span>Print Label Card</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              class="h-9 gap-1.5 text-xs cursor-pointer font-semibold border-border hover:bg-muted"
-              @click="openPrintStudio('code-only')"
-            >
-              <component :is="codeKind === 'barcode' ? BarcodeIcon : QrCode" class="size-3.5 text-primary" />
-              <span>Print Code Only</span>
             </Button>
           </div>
         </div>

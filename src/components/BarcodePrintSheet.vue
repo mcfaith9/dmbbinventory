@@ -29,6 +29,7 @@ const props = withDefaults(
     showAssetTag?: boolean
     visible?: boolean
     initialPrintMode?: PrintModeOption
+    showToolbar?: boolean
   }>(),
   {
     labelSize: 'standard',
@@ -41,6 +42,7 @@ const props = withDefaults(
     showAssetTag: true,
     visible: true,
     initialPrintMode: 'full',
+    showToolbar: true,
   }
 )
 
@@ -221,12 +223,17 @@ async function handlePrint(modeToPrint: PrintModeOption = printMode.value) {
     isPrinting.value = false
   }
 }
+
+defineExpose({
+  handlePrint,
+  renderAllCodes,
+})
 </script>
 
 <template>
   <div v-if="visible" class="space-y-4">
-    <!-- Configuration Toolbar (Hidden during print) -->
-    <div class="no-print space-y-3 rounded-lg border border-border bg-card p-4 shadow-xs">
+    <!-- Configuration Toolbar (Hidden during print or when showToolbar is false) -->
+    <div v-if="showToolbar" class="no-print space-y-3 rounded-lg border border-border bg-card p-4 shadow-xs">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-3">
         <div class="flex items-center gap-2">
           <Printer class="size-4 text-primary" />
@@ -402,7 +409,7 @@ async function handlePrint(modeToPrint: PrintModeOption = printMode.value) {
       v-show="printMode === 'full'"
       ref="printableAreaRef"
       id="printable-area"
-      class="bg-white text-black p-3 font-sans rounded-lg border border-neutral-200"
+      class="bg-white text-black p-3 font-sans rounded-lg border border-neutral-200 print:p-0 print:m-0 print:border-none print:shadow-none print:rounded-none"
     >
       <div
         class="grid gap-2.5"
@@ -417,7 +424,7 @@ async function handlePrint(modeToPrint: PrintModeOption = printMode.value) {
           <div
             v-for="copyIndex in item.copies"
             :key="`full-${item.product.id}-${itemIdx}-${copyIndex}`"
-            class="label-card flex flex-col justify-between border border-dashed border-neutral-300 p-2 text-center bg-white text-black relative"
+            class="label-card flex flex-col justify-between border border-dashed border-neutral-300 p-2 text-center bg-white text-black relative print:border-none print:border-0 print:outline-none print:shadow-none print:p-0 print:m-0 print:bg-transparent print:rounded-none"
             :class="{
               'min-h-[115px]': activeLabelSize === 'compact',
               'min-h-[155px]': activeLabelSize === 'standard' || activeLabelSize === 'a4-grid',
@@ -426,8 +433,10 @@ async function handlePrint(modeToPrint: PrintModeOption = printMode.value) {
             }"
             style="page-break-inside: avoid; break-inside: avoid;"
           >
-            <!-- 1. Label Top: Company Header & Asset Tracking ID -->
-            <div class="w-full flex items-center justify-between border-b border-neutral-200 pb-1 mb-1">
+            <!-- Actual printable label content container -->
+            <div class="label-printable-content flex flex-col justify-between h-full w-full">
+              <!-- 1. Label Top: Company Header & Asset Tracking ID -->
+              <div class="w-full flex items-center justify-between border-b border-neutral-200 pb-1 mb-1">
               <span v-if="displayCompany" class="text-[9px] font-bold tracking-wider font-mono uppercase text-neutral-800 truncate">
                 {{ activeCompanyName || 'COMPANY INVENTORY' }}
               </span>
@@ -494,9 +503,10 @@ async function handlePrint(modeToPrint: PrintModeOption = printMode.value) {
               </span>
             </div>
           </div>
-        </template>
-      </div>
+        </div>
+      </template>
     </div>
+  </div>
 
     <!-- 2. DEDICATED CODE-ONLY PRINT CONTAINER (Rendered in preview & cloned when Print Code Only is called) -->
     <!-- Contains ONLY the generated SVG barcode and/or QR canvas. NO borders, NO branding, NO text, NO prices. Pure white background. -->
@@ -504,7 +514,7 @@ async function handlePrint(modeToPrint: PrintModeOption = printMode.value) {
       v-show="printMode === 'code-only'"
       ref="codeOnlyPrintRef"
       id="code-only-printable-area"
-      class="bg-white text-black p-3 font-sans rounded-lg border border-neutral-200"
+      class="bg-white text-black p-3 font-sans rounded-lg border border-neutral-200 print:p-0 print:m-0 print:border-none print:shadow-none print:rounded-none"
     >
       <div
         class="grid gap-3"
@@ -519,7 +529,7 @@ async function handlePrint(modeToPrint: PrintModeOption = printMode.value) {
           <div
             v-for="copyIndex in item.copies"
             :key="`codeonly-${item.product.id}-${itemIdx}-${copyIndex}`"
-            class="code-only-item flex items-center justify-center p-2 text-center bg-white"
+            class="code-only-item flex items-center justify-center p-2 text-center bg-white print:border-none print:border-0 print:outline-none print:shadow-none print:p-0 print:m-0 print:bg-transparent print:rounded-none"
             style="page-break-inside: avoid; break-inside: avoid; background-color: #ffffff;"
           >
             <!-- 1. Barcode Only (Clean SVG, centered, no card border, scannable digits included under bars) -->

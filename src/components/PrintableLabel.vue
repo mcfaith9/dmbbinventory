@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import BarcodePrintSheet, {
   type PrintableLabelItem,
   type LabelDimensionPreset,
@@ -17,15 +18,23 @@ defineProps<{
   showAssetTag?: boolean
   visible?: boolean
   initialPrintMode?: PrintModeOption
+  showToolbar?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'close'): void
 }>()
+
+const innerSheetRef = ref<InstanceType<typeof BarcodePrintSheet> | null>(null)
+
+defineExpose({
+  handlePrint: (mode?: PrintModeOption) => innerSheetRef.value?.handlePrint(mode),
+  renderAllCodes: () => innerSheetRef.value?.renderAllCodes(),
+})
 </script>
 
 <template>
-  <BarcodePrintSheet v-bind="$props" @close="emit('close')" />
+  <BarcodePrintSheet ref="innerSheetRef" v-bind="$props" @close="emit('close')" />
 </template>
 
 <script lang="ts">
