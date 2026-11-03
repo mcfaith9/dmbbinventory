@@ -17,6 +17,7 @@ import {
   Ruler,
   BarChart3,
   Settings,
+  UsersRound,
 } from "@lucide/vue"
 import NavUser from '@/components/NavUser.vue'
 import { AuthService } from '@/services/auth.service'
@@ -52,8 +53,8 @@ const navigationGroups = [
     label: 'Inventory',
     items: [
       { title: 'Products', path: '/products', icon: Package },
-      { title: 'Barcode Scanner', path: '/barcode-scanner', icon: ScanLine },
-      { title: 'Barcode Generator', path: '/barcode-generator', icon: Barcode },
+      { title: 'Scanner (Barcode & QR)', path: '/barcode-scanner', icon: ScanLine },
+      { title: 'Barcode & QR Generator', path: '/barcode-generator', icon: Barcode },
       { title: 'Stock In', path: '/stock-in', icon: ArrowDownToLine },
       { title: 'Stock Out', path: '/stock-out', icon: ArrowUpFromLine },
       { title: 'Stock Adjustments', path: '/stock-adjustments', icon: SlidersHorizontal },
@@ -66,6 +67,7 @@ const navigationGroups = [
       { title: 'Categories', path: '/categories', icon: FolderTree },
       { title: 'Suppliers', path: '/suppliers', icon: Truck },
       { title: 'Units of Measure', path: '/units', icon: Ruler },
+      { title: 'Users & Roles', path: '/settings', icon: UsersRound },
     ],
   },
   {

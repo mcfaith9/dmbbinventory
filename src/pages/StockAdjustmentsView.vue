@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { productRepo, transactionRepo } from '@/repositories'
 import { InventoryService } from '@/services/inventory.service'
+import { formatPHP } from '@/lib/currency'
 import type { Product, InventoryTransaction } from '@/database/core/database.types'
 
 const route = useRoute()
@@ -196,6 +197,9 @@ onMounted(() => {
                 :class="difference > 0 ? 'text-emerald-600 dark:text-emerald-400' : difference < 0 ? 'text-destructive' : 'text-muted-foreground'"
               >
                 {{ difference > 0 ? `+${difference}` : difference }}
+              </div>
+              <div v-if="selectedProduct && difference !== 0" class="text-[10px] font-mono text-muted-foreground">
+                {{ formatPHP(Math.abs(difference) * selectedProduct.costPrice) }} impact
               </div>
             </div>
           </div>

@@ -27,6 +27,7 @@ import {
   supplierRepo,
 } from '@/repositories'
 import { BarcodeService } from '@/services/barcode.service'
+import { formatPHP } from '@/lib/currency'
 import BarcodePrintSheet, { type PrintableLabelItem } from '@/components/BarcodePrintSheet.vue'
 import type {
   Product,
@@ -510,8 +511,8 @@ async function handleDeleteProduct(id: string, name: string) {
 
               <!-- Cost / Retail Price -->
               <td class="py-2.5 px-3 text-right font-mono tabular-nums">
-                <div class="font-semibold text-foreground">${{ p.sellingPrice.toFixed(2) }}</div>
-                <div class="text-[10px] text-muted-foreground">Cost: ${{ p.costPrice.toFixed(2) }}</div>
+                <div class="font-semibold text-foreground">{{ formatPHP(p.sellingPrice) }}</div>
+                <div class="text-[10px] text-muted-foreground">Cost: {{ formatPHP(p.costPrice) }}</div>
               </td>
 
               <!-- Status -->
@@ -679,12 +680,12 @@ async function handleDeleteProduct(id: string, name: string) {
           <!-- Pricing & Stock Thresholds -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
-              <Label class="text-xs font-semibold">Cost Price ($)</Label>
+              <Label class="text-xs font-semibold">Cost Price (₱)</Label>
               <Input v-model.number="form.costPrice" type="number" step="0.01" min="0" class="h-8 mt-1 text-xs font-mono" />
             </div>
 
             <div>
-              <Label class="text-xs font-semibold">Selling Price ($)</Label>
+              <Label class="text-xs font-semibold">Selling Price (₱)</Label>
               <Input v-model.number="form.sellingPrice" type="number" step="0.01" min="0" class="h-8 mt-1 text-xs font-mono" />
             </div>
 

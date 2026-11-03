@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { productRepo, transactionRepo } from '@/repositories'
 import { InventoryService } from '@/services/inventory.service'
+import { formatPHP } from '@/lib/currency'
 import type { Product, InventoryTransaction } from '@/database/core/database.types'
 
 const isLoading = ref(true)
@@ -160,7 +161,7 @@ onMounted(() => {
           <div>
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Inventory Cost Value</div>
             <div class="text-xl font-bold font-mono tabular-nums text-foreground mt-0.5">
-              ${{ metrics.totalCostValuation.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+              {{ formatPHP(metrics.totalCostValuation) }}
             </div>
           </div>
         </div>
@@ -175,7 +176,7 @@ onMounted(() => {
           <div>
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Estimated Retail Value</div>
             <div class="text-xl font-bold font-mono tabular-nums text-foreground mt-0.5">
-              ${{ metrics.totalRetailValuation.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+              {{ formatPHP(metrics.totalRetailValuation) }}
             </div>
           </div>
         </div>
@@ -332,7 +333,7 @@ onMounted(() => {
                   {{ prod.currentStock }}
                 </td>
                 <td class="py-2 px-3 text-right font-mono tabular-nums font-medium text-foreground">
-                  ${{ prod.sellingPrice.toFixed(2) }}
+                  {{ formatPHP(prod.sellingPrice) }}
                 </td>
               </tr>
             </tbody>

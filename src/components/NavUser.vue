@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import {
-  BadgeCheck,
+  UsersRound,
   Bell,
   ChevronsUpDown,
   CreditCard,
   LogOut,
   Sparkles,
 } from "@lucide/vue"
+import { RouterLink } from 'vue-router'
 
 import {
   Avatar,
@@ -100,9 +101,11 @@ function handleLogout() {
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem>
-              <BadgeCheck />
-              Account
+            <DropdownMenuItem as-child>
+              <RouterLink to="/settings" class="flex items-center gap-2 w-full cursor-pointer">
+                <UsersRound class="size-4" />
+                <span>Account Profile</span>
+              </RouterLink>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <CreditCard />

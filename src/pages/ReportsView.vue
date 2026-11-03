@@ -7,6 +7,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { productRepo, transactionRepo } from '@/repositories'
 import { ReportService } from '@/services/report.service'
+import { formatPHP } from '@/lib/currency'
 import type { Product, InventoryTransaction } from '@/database/core/database.types'
 
 type ReportType =
@@ -129,13 +130,13 @@ onMounted(() => {
       <div class="p-3 rounded-lg border border-border bg-card shadow-xs">
         <span class="text-[10px] uppercase font-medium text-muted-foreground">Inventory Cost Asset</span>
         <div class="text-xl font-bold font-mono tabular-nums text-foreground mt-0.5">
-          ${{ totalCostValuation.toFixed(2) }}
+          {{ formatPHP(totalCostValuation) }}
         </div>
       </div>
       <div class="p-3 rounded-lg border border-border bg-card shadow-xs">
         <span class="text-[10px] uppercase font-medium text-muted-foreground">Potential Retail Value</span>
         <div class="text-xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400 mt-0.5">
-          ${{ totalRetailValuation.toFixed(2) }}
+          {{ formatPHP(totalRetailValuation) }}
         </div>
       </div>
     </div>
@@ -262,16 +263,16 @@ onMounted(() => {
               <div class="font-mono text-[10px] text-muted-foreground">{{ p.sku }}</div>
             </td>
             <td class="py-2.5 px-3 text-right font-mono tabular-nums">{{ p.currentStock }}</td>
-            <td class="py-2.5 px-3 text-right font-mono tabular-nums">${{ p.costPrice.toFixed(2) }}</td>
+            <td class="py-2.5 px-3 text-right font-mono tabular-nums">{{ formatPHP(p.costPrice) }}</td>
             <td class="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-foreground">
-              ${{ (p.currentStock * p.costPrice).toFixed(2) }}
+              {{ formatPHP(p.currentStock * p.costPrice) }}
             </td>
-            <td class="py-2.5 px-3 text-right font-mono tabular-nums">${{ p.sellingPrice.toFixed(2) }}</td>
+            <td class="py-2.5 px-3 text-right font-mono tabular-nums">{{ formatPHP(p.sellingPrice) }}</td>
             <td class="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
-              ${{ (p.currentStock * p.sellingPrice).toFixed(2) }}
+              {{ formatPHP(p.currentStock * p.sellingPrice) }}
             </td>
             <td class="py-2.5 px-3 text-right font-mono tabular-nums font-semibold">
-              ${{ (p.currentStock * (p.sellingPrice - p.costPrice)).toFixed(2) }}
+              {{ formatPHP(p.currentStock * (p.sellingPrice - p.costPrice)) }}
             </td>
           </tr>
         </tbody>

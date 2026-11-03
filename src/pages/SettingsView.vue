@@ -4,7 +4,7 @@ import {
   Database,
   Sparkles,
   Trash2,
-  User,
+  UsersRound,
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
@@ -118,7 +118,7 @@ onMounted(() => {
     <div class="rounded-lg border border-border bg-card p-5 shadow-xs space-y-3">
       <div class="flex items-center justify-between border-b pb-2">
         <h2 class="text-sm font-semibold flex items-center gap-2">
-          <User class="size-4 text-primary" />
+          <UsersRound class="size-4 text-primary" />
           Active Session & Role
         </h2>
         <span class="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold">Authenticated</span>

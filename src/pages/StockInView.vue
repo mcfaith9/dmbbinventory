@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { productRepo, supplierRepo } from '@/repositories'
 import { InventoryService } from '@/services/inventory.service'
+import { formatPHP } from '@/lib/currency'
 import type { Product, Supplier } from '@/database/core/database.types'
 
 const route = useRoute()
@@ -208,12 +209,15 @@ onMounted(() => {
         <div>
           <div class="font-semibold text-foreground">{{ selectedProduct.name }}</div>
           <div class="font-mono text-[11px] text-muted-foreground">
-            SKU: {{ selectedProduct.sku }} &bull; Barcode: {{ selectedProduct.barcode }}
+            SKU: {{ selectedProduct.sku }} &bull; Barcode: {{ selectedProduct.barcode }} &bull; Unit Cost: {{ formatPHP(selectedProduct.costPrice) }}
           </div>
         </div>
         <div class="text-right">
           <div class="text-xs text-muted-foreground">Current Balance:</div>
           <div class="text-lg font-bold font-mono text-foreground">{{ selectedProduct.currentStock }} units</div>
+          <div v-if="quantity > 0" class="text-[11px] text-muted-foreground font-mono">
+            Intake Value: <span class="font-semibold text-emerald-600 dark:text-emerald-400">{{ formatPHP(selectedProduct.costPrice * quantity) }}</span>
+          </div>
         </div>
       </div>
 

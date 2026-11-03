@@ -11,13 +11,16 @@ import {
   AlertCircle,
   Package,
   RefreshCw,
+  QrCode,
+  Barcode as BarcodeIcon,
 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Html5Qrcode } from 'html5-qrcode'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { productRepo } from '@/repositories'
 import { InventoryService } from '@/services/inventory.service'
+import { formatPHP } from '@/lib/currency'
 import type { Product } from '@/database/core/database.types'
 
 // Mode
@@ -38,7 +41,8 @@ const cameraError = ref('')
 const scannedProduct = ref<Product | null>(null)
 const scanError = ref('')
 const isSearching = ref(false)
-const lastScannedBarcode = ref('')
+const lastScannedCode = ref('')
+const detectedCodeType = ref<'QR Code' | '1D Barcode' | 'Unknown'>('Unknown')
 
 // Stock In / Out Quick Action Modal
 const quickActionModal = ref<'in' | 'out' | null>(null)
@@ -67,24 +71,23 @@ function playBeep(success: boolean = true) {
   }
 }
 
-// Global Keydown Listener for USB Hardware Wedge Barcode Scanners
+// Global Keydown Listener for USB & Bluetooth Hardware Wedge Scanners
 function handleGlobalKeydown(e: KeyboardEvent) {
-  // If user is focused on an action input modal, don't capture as USB scanner
   if (quickActionModal.value) return
 
   const now = Date.now()
   const char = e.key
 
-  // Scanners fire rapid keys (<50ms between keystrokes)
+  // Hardware scanners fire rapid keystrokes (<70ms apart)
   if (now - lastKeyTime.value > 100) {
     scanBuffer.value = ''
   }
   lastKeyTime.value = now
 
   if (char === 'Enter') {
-    if (scanBuffer.value.length >= 3) {
+    if (scanBuffer.value.length >= 2) {
       e.preventDefault()
-      processBarcodeLookup(scanBuffer.value)
+      processCodeLookup(scanBuffer.value)
       scanBuffer.value = ''
       usbStatus.value = 'received'
       setTimeout(() => {
@@ -96,19 +99,56 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
-async function processBarcodeLookup(barcode: string) {
-  const cleanBarcode = barcode.trim()
-  if (!cleanBarcode) return
+/**
+ * Extracts candidate product identifiers from raw scanned data (supports plain text, JSON, or deep links)
+ */
+function extractLookupKey(raw: string): { key: string; likelyType: 'QR Code' | '1D Barcode' } {
+  const trimmed = raw.trim()
+
+  // 1. Check if structured JSON payload from QR
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      const candidate = parsed.sku || parsed.barcode || parsed.id || ''
+      return { key: candidate || trimmed, likelyType: 'QR Code' }
+    } catch {
+      // not JSON
+    }
+  }
+
+  // 2. Check if deep link URL (e.g. /products/UUID)
+  if (trimmed.includes('/products/')) {
+    const parts = trimmed.split('/products/')
+    const candidate = parts[1]?.split('?')[0]?.replace(/\/$/, '') || ''
+    if (candidate) return { key: candidate, likelyType: 'QR Code' }
+  }
+
+  // 3. Heuristic: 1D barcodes are typically purely digits (EAN13, UPC) or simple short alphanumeric (Code128)
+  const isAllDigits = /^\d{8,14}$/.test(trimmed)
+  const likelyType = isAllDigits ? '1D Barcode' : (trimmed.length > 25 || trimmed.includes('{') || trimmed.includes('http') ? 'QR Code' : '1D Barcode')
+
+  return { key: trimmed, likelyType }
+}
+
+async function processCodeLookup(rawCode: string) {
+  const { key, likelyType } = extractLookupKey(rawCode)
+  if (!key) return
 
   isSearching.value = true
   scanError.value = ''
-  lastScannedBarcode.value = cleanBarcode
+  lastScannedCode.value = key
+  detectedCodeType.value = likelyType
 
   try {
-    // Lookup by barcode or SKU
-    let product = await productRepo.getByBarcode(cleanBarcode)
+    // 1. Lookup by exact Barcode
+    let product = await productRepo.getByBarcode(key)
+    // 2. Lookup by SKU
     if (!product) {
-      product = await productRepo.getBySku(cleanBarcode)
+      product = await productRepo.getBySku(key)
+    }
+    // 3. Lookup by Product ID
+    if (!product) {
+      product = await productRepo.getById(key)
     }
 
     if (product) {
@@ -116,11 +156,11 @@ async function processBarcodeLookup(barcode: string) {
       playBeep(true)
     } else {
       scannedProduct.value = null
-      scanError.value = `No registered product found for barcode "${cleanBarcode}".`
+      scanError.value = `No registered inventory product matches scanned code "${key}".`
       playBeep(false)
     }
   } catch (err: any) {
-    scanError.value = err.message || 'Error looking up barcode.'
+    scanError.value = err.message || 'Error looking up scanned product code.'
     scannedProduct.value = null
     playBeep(false)
   } finally {
@@ -130,39 +170,57 @@ async function processBarcodeLookup(barcode: string) {
 
 function handleManualSearch() {
   if (manualInput.value.trim()) {
-    processBarcodeLookup(manualInput.value)
+    processCodeLookup(manualInput.value)
     manualInput.value = ''
   }
 }
 
-// Camera Scanner Implementation
+// Camera Scanner Implementation supporting both 1D Barcodes and 2D QR Codes
 async function startCamera() {
   cameraError.value = ''
   try {
     if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode('camera-reader-viewport')
+      html5QrCode = new Html5Qrcode('camera-reader-viewport', {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+        ],
+        verbose: false,
+      })
     }
 
     await html5QrCode.start(
       { facingMode: 'environment' },
       {
         fps: 15,
-        qrbox: { width: 280, height: 180 },
-        aspectRatio: 1.777778,
+        qrbox: { width: 260, height: 200 },
+        aspectRatio: 1.333333,
       },
-      (decodedText) => {
-        // Prevent repeated scans of the same barcode within 2 seconds
-        if (decodedText !== lastScannedBarcode.value || !scannedProduct.value) {
-          processBarcodeLookup(decodedText)
+      (decodedText, decodedResult) => {
+        // Distinguish format from decoded result if available
+        const formatName = decodedResult?.result?.format?.formatName || ''
+        if (formatName.toLowerCase().includes('qr')) {
+          detectedCodeType.value = 'QR Code'
+        } else if (formatName) {
+          detectedCodeType.value = '1D Barcode'
+        }
+
+        if (decodedText !== lastScannedCode.value || !scannedProduct.value) {
+          processCodeLookup(decodedText)
         }
       },
       () => {
-        // scan error ignored
+        // Frame scan misses ignored
       }
     )
     isCameraActive.value = true
   } catch (err: any) {
-    cameraError.value = err?.message || 'Unable to access camera. Please check camera permissions.'
+    cameraError.value = err?.message || 'Unable to access camera. Please allow camera permissions.'
     isCameraActive.value = false
   }
 }
@@ -196,14 +254,14 @@ onUnmounted(() => {
   stopCamera()
 })
 
-// Quick Stock In / Out Handlers
+// Quick Stock In / Out Handlers from Scanner View
 function openQuickAction(type: 'in' | 'out') {
   if (!scannedProduct.value) return
   quickActionModal.value = type
   actionQuantity.value = 1
   actionRef.value = `${type === 'in' ? 'RCV' : 'DSP'}-${Date.now().toString().slice(-6)}`
   actionParty.value = type === 'in' ? 'Warehouse Dock' : 'Store Dispatch'
-  actionRemarks.value = 'Fast barcode scanner transaction'
+  actionRemarks.value = 'Fast barcode/QR scanner transaction'
   actionSuccessMessage.value = ''
 }
 
@@ -256,9 +314,9 @@ async function executeQuickAction() {
   <div class="space-y-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight">Barcode Scanner</h1>
+        <h1 class="text-2xl font-bold tracking-tight">Barcode & QR Code Scanner</h1>
         <p class="text-xs text-muted-foreground">
-          Scan product barcodes with physical USB laser scanners or your device camera
+          Instant multi-format scanning via USB/Bluetooth hardware wedge or device camera with real-time stock intake & dispatch
         </p>
       </div>
 
@@ -271,7 +329,7 @@ async function executeQuickAction() {
           @click="setScanMode('usb')"
         >
           <Keyboard class="size-3.5" />
-          <span>USB / Keyboard Scanner</span>
+          <span>USB / Bluetooth Wedge</span>
         </button>
 
         <button
@@ -281,7 +339,7 @@ async function executeQuickAction() {
           @click="setScanMode('camera')"
         >
           <Camera class="size-3.5" />
-          <span>Camera Scanner</span>
+          <span>Device Camera</span>
         </button>
       </div>
     </div>
@@ -295,7 +353,7 @@ async function executeQuickAction() {
           <div class="flex items-center justify-between border-b pb-3">
             <h2 class="text-sm font-semibold flex items-center gap-2">
               <Keyboard class="size-4 text-primary" />
-              Hardware USB Wedge Listener
+              Hardware Wedge Listener
             </h2>
             <span
               class="font-mono text-[10px] uppercase font-semibold px-2 py-0.5 rounded"
@@ -308,16 +366,16 @@ async function executeQuickAction() {
           <div class="rounded-lg border border-dashed border-border bg-muted/30 p-5 text-center space-y-2">
             <ScanLine class="size-10 mx-auto text-primary animate-pulse" />
             <p class="text-xs font-semibold text-foreground">
-              Ready for USB / Bluetooth Laser Gun
+              Ready for Barcode Gun or 2D QR Scanner
             </p>
             <p class="text-[11px] text-muted-foreground max-w-xs mx-auto">
-              Aim your handheld barcode gun at any product barcode. The scanner automatically detects barcodes terminating with the Enter key.
+              Aim your handheld USB or Bluetooth scanner at any 1D barcode or 2D QR code label. Keystrokes are captured automatically without clicking.
             </p>
           </div>
 
           <!-- Manual / Testing Input Field -->
           <div class="pt-2">
-            <Label for="manual-scan" class="text-xs font-semibold">Or Type / Paste Barcode Manually</Label>
+            <Label for="manual-scan" class="text-xs font-semibold">Or Type / Paste Code Manually</Label>
             <div class="flex gap-2 mt-1">
               <Input
                 id="manual-scan"
@@ -338,7 +396,7 @@ async function executeQuickAction() {
           <div class="flex items-center justify-between border-b pb-3">
             <h2 class="text-sm font-semibold flex items-center gap-2">
               <Camera class="size-4 text-primary" />
-              Camera Viewfinder
+              Unified 1D & 2D Camera Viewfinder
             </h2>
             <Button
               variant="outline"
@@ -366,7 +424,7 @@ async function executeQuickAction() {
             </div>
           </div>
           <p class="text-[11px] text-muted-foreground text-center">
-            Center the barcode inside the framing box for auto-detection
+            Auto-detects both traditional barcodes and 2D QR codes in the viewfinder
           </p>
         </div>
       </div>
@@ -379,15 +437,20 @@ async function executeQuickAction() {
               <Package class="size-4 text-primary" />
               Scan Result
             </h2>
-            <span v-if="lastScannedBarcode" class="font-mono text-xs text-muted-foreground">
-              Last Code: {{ lastScannedBarcode }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span v-if="detectedCodeType !== 'Unknown'" class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-muted font-semibold">
+                {{ detectedCodeType }}
+              </span>
+              <span v-if="lastScannedCode" class="font-mono text-xs text-muted-foreground">
+                Code: {{ lastScannedCode }}
+              </span>
+            </div>
           </div>
 
           <!-- Searching State -->
           <div v-if="isSearching" class="p-12 text-center text-xs text-muted-foreground">
             <RefreshCw class="size-6 animate-spin mx-auto mb-2 text-primary" />
-            Searching database...
+            Querying local database...
           </div>
 
           <!-- Error / Unregistered State -->
@@ -398,7 +461,7 @@ async function executeQuickAction() {
             <div>
               <p class="text-xs font-semibold text-destructive">{{ scanError }}</p>
               <p class="text-[11px] text-muted-foreground mt-1">
-                You can register this barcode to a new product.
+                You can create a new catalog product with this identifier.
               </p>
             </div>
             <Button size="sm" as-child class="h-8 text-xs">
@@ -411,16 +474,16 @@ async function executeQuickAction() {
           <!-- Empty State (Waiting for scan) -->
           <div v-else-if="!scannedProduct" class="p-12 text-center text-xs text-muted-foreground">
             <ScanLine class="size-10 mx-auto mb-2 text-muted-foreground/40" />
-            <p class="font-medium text-foreground">Waiting for barcode scan...</p>
-            <p class="text-[11px] mt-1">Scan a product barcode using your USB scanner or camera.</p>
+            <p class="font-medium text-foreground">Waiting for code scan...</p>
+            <p class="text-[11px] mt-1">Scan a product 1D barcode or 2D QR code using your USB wedge or device camera.</p>
           </div>
 
           <!-- Found Product Card -->
           <div v-else class="space-y-4 pt-2">
             <div class="flex items-start justify-between">
               <div>
-                <span class="font-mono text-[10px] text-primary font-bold uppercase tracking-wider">
-                  MATCH CONFIRMED
+                <span class="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">
+                  PRODUCT RECOGNIZED
                 </span>
                 <h3 class="text-lg font-bold text-foreground mt-0.5">
                   {{ scannedProduct.name }}
@@ -438,23 +501,23 @@ async function executeQuickAction() {
                   {{ scannedProduct.currentStock }}
                 </div>
                 <div class="text-[11px] text-muted-foreground">
-                  In Stock (Min: {{ scannedProduct.minStockLevel }})
+                  Current Balance (Min: {{ scannedProduct.minStockLevel }})
                 </div>
               </div>
             </div>
 
-            <!-- Pricing & Specification Strip -->
+            <!-- Pricing & Specification Strip formatted in Philippine Peso (₱) -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-muted/40 text-xs">
               <div>
                 <span class="text-muted-foreground text-[10px]">Selling Price</span>
                 <div class="font-mono font-bold text-sm text-foreground">
-                  ${{ scannedProduct.sellingPrice.toFixed(2) }}
+                  {{ formatPHP(scannedProduct.sellingPrice) }}
                 </div>
               </div>
               <div>
                 <span class="text-muted-foreground text-[10px]">Cost Price</span>
                 <div class="font-mono font-bold text-sm text-foreground">
-                  ${{ scannedProduct.costPrice.toFixed(2) }}
+                  {{ formatPHP(scannedProduct.costPrice) }}
                 </div>
               </div>
               <div>
@@ -464,7 +527,7 @@ async function executeQuickAction() {
                 </div>
               </div>
               <div>
-                <span class="text-muted-foreground text-[10px]">Status</span>
+                <span class="text-muted-foreground text-[10px]">Catalog Status</span>
                 <div class="font-medium text-xs text-emerald-600 dark:text-emerald-400 capitalize">
                   {{ scannedProduct.status }}
                 </div>
@@ -526,7 +589,7 @@ async function executeQuickAction() {
               :class="quickActionModal === 'in' ? 'text-emerald-600' : 'text-amber-600'"
             />
             <h2 class="text-base font-bold">
-              {{ quickActionModal === 'in' ? 'Quick Stock In' : 'Quick Stock Out' }}
+              {{ quickActionModal === 'in' ? 'Quick Stock In Intake' : 'Quick Stock Out Dispatch' }}
             </h2>
           </div>
           <button type="button" class="text-muted-foreground hover:text-foreground text-lg" @click="quickActionModal = null">
@@ -540,7 +603,7 @@ async function executeQuickAction() {
         </div>
 
         <div class="text-xs text-muted-foreground font-mono">
-          Product: <span class="text-foreground font-semibold">{{ scannedProduct.name }}</span> (Available: {{ scannedProduct.currentStock }})
+          Product: <span class="text-foreground font-semibold">{{ scannedProduct.name }}</span> (Available: {{ scannedProduct.currentStock }} &bull; Unit: {{ formatPHP(quickActionModal === 'in' ? scannedProduct.costPrice : scannedProduct.sellingPrice) }})
         </div>
 
         <form @submit.prevent="executeQuickAction" class="space-y-3 text-xs">
@@ -557,6 +620,12 @@ async function executeQuickAction() {
               required
               class="h-8 mt-1 font-mono text-sm font-bold"
             />
+            <div v-if="actionQuantity > 0" class="text-[11px] text-muted-foreground mt-0.5 font-mono">
+              Total Transaction Value:
+              <span class="font-semibold text-foreground">
+                {{ formatPHP(actionQuantity * (quickActionModal === 'in' ? scannedProduct.costPrice : scannedProduct.sellingPrice)) }}
+              </span>
+            </div>
           </div>
 
           <div>

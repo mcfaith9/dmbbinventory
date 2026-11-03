@@ -25,6 +25,8 @@ import {
   transactionRepo,
 } from '@/repositories'
 import { BarcodeService } from '@/services/barcode.service'
+import { QRCodeService } from '@/services/qr.service'
+import { formatPHP } from '@/lib/currency'
 import BarcodePrintSheet from '@/components/BarcodePrintSheet.vue'
 import type {
   Product,
@@ -48,6 +50,8 @@ const transactions = ref<InventoryTransaction[]>([])
 const isLoading = ref(true)
 
 const barcodeSvg = ref<SVGSVGElement | null>(null)
+const qrCanvas = ref<HTMLCanvasElement | null>(null)
+const activeCodeTab = ref<'barcode' | 'qr'>('barcode')
 const showPrintSheet = ref(false)
 
 async function loadProductData() {
@@ -74,7 +78,7 @@ async function loadProductData() {
     supplier.value = sup || null
     transactions.value = txs
 
-    renderBarcode()
+    renderCodes()
   } catch (err) {
     console.error('Failed to load product details:', err)
   } finally {
@@ -82,7 +86,7 @@ async function loadProductData() {
   }
 }
 
-function renderBarcode() {
+function renderCodes() {
   nextTick(() => {
     if (barcodeSvg.value && product.value) {
       BarcodeService.renderBarcode(
@@ -96,7 +100,19 @@ function renderBarcode() {
         }
       )
     }
+    if (qrCanvas.value && product.value) {
+      QRCodeService.renderToCanvas(
+        qrCanvas.value,
+        product.value.sku || product.value.barcode,
+        { width: 130, margin: 1 }
+      )
+    }
   })
+}
+
+function switchCodeTab(tab: 'barcode' | 'qr') {
+  activeCodeTab.value = tab
+  renderCodes()
 }
 
 onMounted(() => {
@@ -172,17 +188,41 @@ onMounted(() => {
 
     <!-- Overview Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <!-- Live Barcode Card -->
-      <div class="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-xs flex flex-col items-center justify-center text-center">
+      <!-- Live Barcode & QR Code Card -->
+      <div class="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-xs flex flex-col items-center justify-between text-center">
         <div class="w-full flex justify-between items-center text-xs text-muted-foreground pb-2 border-b">
-          <span class="font-medium uppercase tracking-wider text-[10px]">Barcode Label Preview</span>
-          <span class="font-mono text-[10px]">{{ product.barcodeFormat }}</span>
+          <span class="font-medium uppercase tracking-wider text-[10px]">Code Preview</span>
+          <div class="inline-flex rounded-md p-0.5 bg-muted">
+            <button
+              type="button"
+              class="px-2 py-0.5 text-[10px] font-medium rounded cursor-pointer transition-colors"
+              :class="activeCodeTab === 'barcode' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+              @click="switchCodeTab('barcode')"
+            >
+              Barcode
+            </button>
+            <button
+              type="button"
+              class="px-2 py-0.5 text-[10px] font-medium rounded cursor-pointer transition-colors"
+              :class="activeCodeTab === 'qr' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+              @click="switchCodeTab('qr')"
+            >
+              QR Code
+            </button>
+          </div>
         </div>
-        <div class="py-4 w-full flex justify-center bg-white rounded-md my-2">
-          <svg ref="barcodeSvg" class="max-w-full h-auto"></svg>
+
+        <div class="py-3 w-full flex justify-center items-center bg-white rounded-md my-2 min-h-[120px]">
+          <div v-show="activeCodeTab === 'barcode'" class="w-full flex justify-center">
+            <svg ref="barcodeSvg" class="max-w-full h-auto"></svg>
+          </div>
+          <div v-show="activeCodeTab === 'qr'" class="flex justify-center">
+            <canvas ref="qrCanvas" class="max-w-[130px] max-h-[130px]"></canvas>
+          </div>
         </div>
+
         <div class="font-mono text-xs font-semibold text-muted-foreground">
-          {{ product.barcode }}
+          {{ activeCodeTab === 'barcode' ? product.barcode : (product.sku || product.barcode) }}
         </div>
       </div>
 
@@ -236,23 +276,23 @@ onMounted(() => {
         <div class="grid grid-cols-2 gap-2 text-xs">
           <div>
             <span class="text-muted-foreground text-[11px]">Cost Price:</span>
-            <div class="text-base font-bold font-mono tabular-nums">${{ product.costPrice.toFixed(2) }}</div>
+            <div class="text-base font-bold font-mono tabular-nums">{{ formatPHP(product.costPrice) }}</div>
           </div>
           <div>
             <span class="text-muted-foreground text-[11px]">Selling Price:</span>
-            <div class="text-base font-bold font-mono tabular-nums text-foreground">${{ product.sellingPrice.toFixed(2) }}</div>
+            <div class="text-base font-bold font-mono tabular-nums text-foreground">{{ formatPHP(product.sellingPrice) }}</div>
           </div>
           <div class="pt-2 border-t">
             <span class="text-muted-foreground text-[11px]">Unit Margin:</span>
             <div class="font-mono tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
-              ${{ (product.sellingPrice - product.costPrice).toFixed(2) }}
+              {{ formatPHP(product.sellingPrice - product.costPrice) }}
               ({{ product.costPrice > 0 ? (((product.sellingPrice - product.costPrice) / product.costPrice) * 100).toFixed(0) : '0' }}%)
             </div>
           </div>
           <div class="pt-2 border-t">
             <span class="text-muted-foreground text-[11px]">Total Asset Value:</span>
             <div class="font-mono tabular-nums font-semibold text-foreground">
-              ${{ (product.currentStock * product.costPrice).toFixed(2) }}
+              {{ formatPHP(product.currentStock * product.costPrice) }}
             </div>
           </div>
         </div>
