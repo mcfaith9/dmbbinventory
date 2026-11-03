@@ -126,24 +126,44 @@
   }
 }
 
+@page {
+  size: auto;
+  margin: 6mm;
+}
+
 @media print {
-  body * {
-    visibility: hidden;
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
-  #printable-area, #printable-area * {
-    visibility: visible;
-  }
-  #printable-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    background: white !important;
-    color: black !important;
-  }
+
   .no-print {
     display: none !important;
+  }
+
+  /* When enterprise print portal is active, suppress main SPA container */
+  body.is-printing-labels > #app {
+    display: none !important;
+  }
+
+  body.is-printing-labels #company-print-portal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+
+  .label-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }

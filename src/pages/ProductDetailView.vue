@@ -149,9 +149,9 @@ onMounted(() => {
       </div>
 
       <div class="flex items-center gap-2">
-        <Button variant="outline" size="sm" class="h-8 gap-1.5 text-xs cursor-pointer" @click="showPrintSheet = !showPrintSheet">
+        <Button variant="outline" size="sm" class="h-8 gap-1.5 text-xs cursor-pointer font-medium" @click="showPrintSheet = !showPrintSheet">
           <Printer class="size-3.5" />
-          <span>{{ showPrintSheet ? 'Hide Label Print' : 'Print Barcode' }}</span>
+          <span>{{ showPrintSheet ? 'Hide Label Print' : 'Print Barcode & QR' }}</span>
         </Button>
 
         <Button variant="outline" size="sm" as-child class="h-8 gap-1.5 text-xs">
@@ -181,6 +181,7 @@ onMounted(() => {
     <div v-if="showPrintSheet" class="rounded-lg border border-border bg-card p-4 shadow-sm">
       <BarcodePrintSheet
         :items="[{ product, copies: 4 }]"
+        :code-type="activeCodeTab"
         label-size="standard"
         @close="showPrintSheet = false"
       />

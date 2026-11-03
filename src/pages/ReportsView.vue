@@ -103,7 +103,7 @@ onMounted(() => {
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="no-print flex items-center gap-2">
         <Button variant="outline" size="sm" class="h-8 gap-1.5 text-xs cursor-pointer" @click="printReport">
           <Printer class="size-3.5" />
           <span>Print Report</span>
@@ -142,7 +142,7 @@ onMounted(() => {
     </div>
 
     <!-- Report Selector Tabs -->
-    <div class="flex flex-wrap items-center gap-1.5 p-1 bg-muted rounded-lg border border-border text-xs">
+    <div class="no-print flex flex-wrap items-center gap-1.5 p-1 bg-muted rounded-lg border border-border text-xs">
       <button
         type="button"
         class="px-3 py-1.5 font-medium rounded-md transition-colors cursor-pointer"

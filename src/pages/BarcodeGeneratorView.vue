@@ -171,9 +171,30 @@ function clearBulk() {
   bulkSelected.value = {}
 }
 
-function triggerSinglePrint() {
-  window.print()
-}
+const showSinglePrintSheet = ref(false)
+
+const singlePrintItems = computed<PrintableLabelItem[]>(() => {
+  return [
+    {
+      product: {
+        id: selectedProductId.value || 'ITEM-01',
+        name: labelTitle.value || 'Company Asset',
+        sku: labelSku.value || 'SKU-001',
+        barcode: barcodeValue.value || '000000',
+        barcodeFormat: barcodeFormat.value || 'CODE128',
+        sellingPrice: labelPrice.value || 0,
+        costPrice: 0,
+        currentStock: 1,
+        minStockLevel: 1,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'synced',
+      },
+      copies: labelCopies.value || 1,
+    },
+  ]
+})
 </script>
 
 <template>
@@ -209,9 +230,20 @@ function triggerSinglePrint() {
     </div>
 
     <!-- SINGLE GENERATOR MODE -->
-    <div v-if="activeTab === 'single'" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      <!-- Parameters Form (7 cols) -->
-      <div class="lg:col-span-7 rounded-lg border border-border bg-card p-5 shadow-xs space-y-4">
+    <div v-if="activeTab === 'single'" class="space-y-6">
+      <!-- Single Print Studio Sheet -->
+      <div v-if="showSinglePrintSheet" class="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <BarcodePrintSheet
+          :items="singlePrintItems"
+          :code-type="codeKind"
+          label-size="standard"
+          @close="showSinglePrintSheet = false"
+        />
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Parameters Form (7 cols) -->
+        <div class="lg:col-span-7 rounded-lg border border-border bg-card p-5 shadow-xs space-y-4">
         <div class="flex items-center justify-between border-b pb-3">
           <h2 class="text-sm font-semibold flex items-center gap-2">
             <Settings2 class="size-4 text-primary" />
@@ -406,13 +438,18 @@ function triggerSinglePrint() {
             </Button>
           </div>
 
-          <Button size="sm" class="w-full h-9 gap-1.5 text-xs cursor-pointer" @click="triggerSinglePrint">
+          <Button
+            size="sm"
+            class="w-full h-9 gap-1.5 text-xs cursor-pointer font-semibold bg-primary text-primary-foreground"
+            @click="showSinglePrintSheet = !showSinglePrintSheet"
+          >
             <Printer class="size-4" />
-            <span>Print {{ labelCopies }} Label{{ labelCopies > 1 ? 's' : '' }}</span>
+            <span>{{ showSinglePrintSheet ? 'Close Print Studio' : `Print ${labelCopies} Label${labelCopies > 1 ? 's' : ''} (Sheet Studio)` }}</span>
           </Button>
         </div>
       </div>
     </div>
+  </div>
 
     <!-- BULK GENERATOR / BATCH PRINTING MODE -->
     <div v-else class="space-y-4">
