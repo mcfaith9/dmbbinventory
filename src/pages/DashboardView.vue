@@ -6,7 +6,7 @@ import {
   Boxes,
   AlertTriangle,
   XCircle,
-  DollarSign,
+  PhilippinePeso,
   ArrowDownToLine,
   ArrowUpFromLine,
   ScanLine,
@@ -156,7 +156,7 @@ onMounted(() => {
       <div class="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-xs">
         <div class="flex items-center gap-3">
           <div class="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-            <DollarSign class="size-5" />
+            <PhilippinePeso class="size-5" />
           </div>
           <div>
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Inventory Cost Value</div>
@@ -171,7 +171,7 @@ onMounted(() => {
       <div class="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-xs">
         <div class="flex items-center gap-3">
           <div class="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <DollarSign class="size-5" />
+            <PhilippinePeso class="size-5" />
           </div>
           <div>
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Estimated Retail Value</div>

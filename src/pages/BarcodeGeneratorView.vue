@@ -183,7 +183,7 @@ function triggerSinglePrint() {
       <div>
         <h1 class="text-2xl font-bold tracking-tight">Barcode & QR Code Generator</h1>
         <p class="text-xs text-muted-foreground">
-          Generate high-resolution 1D barcodes and 2D QR codes, download vector and raster assets, and print customized Philippine Peso sticker sheets
+          Generate high-resolution 1D barcodes and 2D QR codes, download vector and raster assets, and print
         </p>
       </div>
 

@@ -96,7 +96,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-4xl space-y-6">
+  <div class="space-y-6">
     <div class="border-b pb-4">
       <h1 class="text-2xl font-bold tracking-tight">System Settings & Database</h1>
       <p class="text-xs text-muted-foreground mt-0.5">
